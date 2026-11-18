@@ -191,6 +191,23 @@ async function main() {
 
   a.close(); b.close();
 
+  await check('PvE gameover records scores', async () => {
+    const e = new Client(), f = new Client();
+    await Promise.all([e.ready(), f.ready()]);
+    e.send({ type: 'create', name: 'Idle1', weapon: 'pistol', mode: 'pve' });
+    const init = await e.waitFor(m => m.type === 'init', 3000, 'init');
+    f.send({ type: 'join', room: init.room, name: 'Idle2', weapon: 'pistol' });
+    await f.waitFor(m => m.type === 'init', 3000, 'friend init');
+    const offE = e.on(m => { if (m.type === 'upgrade') e.send({ type: 'pick', id: m.options[0].id }); });
+    const offF = f.on(m => { if (m.type === 'upgrade') f.send({ type: 'pick', id: m.options[0].id }); });
+    e.send({ type: 'start' });
+    const over = await e.waitFor(m => m.type === 'gameover', 30000, 'PvE gameover');
+    assert.strictEqual(over.results.length, 2);
+    assert.ok(over.leaderboard.length >= 2);
+    assert.ok(typeof over.time === 'number' && over.time >= 0);
+    offE(); offF(); e.close(); f.close();
+  });
+
   // ---- PvP ----------------------------------------------------------------
   const c = new Client(), d = new Client();
   await Promise.all([c.ready(), d.ready()]);
