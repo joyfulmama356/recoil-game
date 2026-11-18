@@ -16,6 +16,7 @@
         <div class="stat"><span class="label">KILLS</span><span id="hud-kills" class="value">0</span></div>
       </div>
       <div class="hud-right">
+        <div class="stat"><span class="label">MODE</span><span id="hud-mode-val" class="value">CO-OP</span></div>
         <div class="stat"><span class="label">ROOM</span><span id="hud-room" class="value">----</span></div>
         <div id="hud-players"></div>
       </div>
@@ -34,6 +35,10 @@
         <h1>RECOIL</h1>
         <p class="tagline">You have no movement keys. <strong>You move by shooting.</strong></p>
         <div class="row"><input id="name-input" maxlength="16" placeholder="Your name" value="Player" /></div>
+        <div class="row">
+          <button id="mode-pve" class="mode-btn active">CO-OP vs ENEMIES</button>
+          <button id="mode-pvp" class="mode-btn">PvP vs FRIENDS</button>
+        </div>
         <div class="row">
           <select id="weapon-select">
             <option value="pistol">Pistol — balanced</option>

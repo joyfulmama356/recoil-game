@@ -54,6 +54,8 @@ input:focus, select:focus { border-color: #ffd43b; }
 button { background: #1d2740; border: 1px solid #ffffff22; color: #fff; padding: 12px 22px; border-radius: 8px; font-size: 13px; font-weight: 700; letter-spacing: 1px; cursor: pointer; transition: .15s; }
 button:hover:not(:disabled) { background: #2a3859; transform: translateY(-1px); }
 button:disabled { opacity: .35; cursor: not-allowed; }
+.mode-btn { flex: 1; font-size: 11px; padding: 10px 6px; background: #0b1020; }
+.mode-btn.active { background: #ff4d6d; border-color: #ff4d6d; color: #fff; }
 button.primary { background: linear-gradient(90deg,#ff4d6d,#ff9f1c); border: none; }
 button.primary:hover { filter: brightness(1.15); }
 .divider { color: #6f7f9c; font-size: 11px; letter-spacing: 2px; margin: 18px 0 14px; }

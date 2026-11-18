@@ -42,6 +42,7 @@ const el = {
   menu: $('menu'), waiting: $('waiting'), upgrade: $('upgrade'), gameover: $('gameover'),
   notice: $('notice'), time: $('hud-time'), kills: $('hud-kills'), room: $('hud-room'),
   players: $('hud-players'), hpFill: $('hp-fill'), weapon: $('hud-weapon'), dash: $('hud-dash'),
+  modeVal: $('hud-mode-val'), modePve: $('mode-pve'), modePvp: $('mode-pvp'),
   error: $('menu-error'), waitingCode: $('waiting-code'), cards: $('upgrade-cards'),
   waitingPlayers: $('waiting-players'), startBtn: $('start-btn'), waitingHint: $('waiting-hint'),
   finalTime: $('final-time'), finalStats: $('final-stats'), leaderboard: $('leaderboard'),
@@ -56,6 +57,9 @@ let weaponDefs = {};
 let enemyDefs = {};
 let previous = null, current = null, prevAt = 0, curAt = 0;
 let phase = 'menu';
+let selectedMode = 'pve';
+let mode = 'pve';
+let pvpLeaderboard = [];
 let upgradeOptions = [];
 let mouse = { x: arena.w / 2, y: arena.h / 2, down: false };
 let keys = {};
@@ -69,8 +73,8 @@ function refreshWeaponOptions() {
   for (const opt of $('weapon-select').options) {
     if (!opt.value) continue;
     const unlock = opt.value === 'smg' ? 120 : opt.value === 'shotgun' ? 240 : opt.value === 'sniper' ? 360 : 0;
-    opt.disabled = best < unlock;
-    opt.textContent = `${opt.textContent.split(' — ')[0]} — ${unlock ? 'unlock at ' + fmt(unlock) : 'balanced'}`;
+    opt.disabled = selectedMode !== 'pvp' && best < unlock;
+    opt.textContent = `${opt.textContent.split(' — ')[0]} — ${selectedMode === 'pvp' ? 'all unlocked' : unlock ? 'unlock at ' + fmt(unlock) : 'balanced'}`;
   }
 }
 function fmt(sec) { return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; }
@@ -95,11 +99,16 @@ function handle(m) {
   switch (m.type) {
     case 'init':
       myId = m.id; hostId = m.hostId; roomCode = m.room; arena = m.arena;
+      mode = m.mode || 'pve'; pvpLeaderboard = m.pvpLeaderboard || [];
       weaponDefs = m.weapons || {}; enemyDefs = m.enemies || {};
       canvas.width = arena.w; canvas.height = arena.h;
       el.room.textContent = roomCode;
       el.waitingCode.textContent = roomCode;
-      renderLeaderboard(m.leaderboard || []);
+      el.modeVal.textContent = mode === 'pvp' ? 'PvP · FIRST TO 5' : 'CO-OP';
+      el.waitingHint.textContent = mode === 'pvp'
+        ? 'PvP: first to 5 kills wins. Waiting for the host to start…'
+        : 'Waiting for the host to start…';
+      renderLeaderboard(mode === 'pvp' ? pvpLeaderboard : (m.leaderboard || []));
       show(el.waiting);
       phase = 'waiting';
       break;
@@ -115,6 +124,8 @@ function handle(m) {
       }
       break;
     case 'start':
+      mode = m.mode || mode;
+      el.modeVal.textContent = mode === 'pvp' ? 'PvP · FIRST TO 5' : 'CO-OP';
       hide(el.waiting); hide(el.menu); hide(el.gameover); hide(el.upgrade);
       phase = 'playing';
       break;
@@ -139,17 +150,25 @@ function handle(m) {
       setTimeout(() => el.notice.classList.remove('show'), 1800);
       shake = 12;
       break;
-    case 'gameover':
+    case 'gameover': {
       phase = 'gameover';
-      const sec = m.time;
-      if (sec > bestTime()) localStorage.setItem('recoil_best', String(sec));
-      refreshWeaponOptions();
-      el.finalTime.textContent = fmt(sec);
+      const pvp = (m.mode || mode) === 'pvp';
+      if (!pvp) {
+        if (m.time > bestTime()) localStorage.setItem('recoil_best', String(m.time));
+        refreshWeaponOptions();
+      }
+      document.querySelector('#gameover h2').innerHTML = pvp
+        ? `MATCH OVER · WINNER <span id="final-time">${m.winner || '—'}</span>`
+        : `SURVIVED <span id="final-time">${fmt(m.time)}</span>`;
+      el.finalTime = $('final-time');
       const me = m.results.find(r => r.name === ($('name-input').value || 'Player'));
-      el.finalStats.innerHTML = m.results.map(r => `<div>${r.name}: ${r.kills} kills / ${r.damage} dmg</div>`).join('');
-      renderLeaderboard(m.leaderboard || [], me);
+      el.finalStats.innerHTML = m.results.map(r => pvp
+        ? `<div>${r.name}: ${r.kills} K / ${r.deaths} D</div>`
+        : `<div>${r.name}: ${r.kills} kills / ${r.damage} dmg</div>`).join('');
+      renderLeaderboard(m.leaderboard || [], me, pvp);
       show(el.gameover);
       break;
+    }
     case 'error':
       showError(m.text);
       break;
@@ -159,9 +178,9 @@ function handle(m) {
 function show(node) { node.classList.remove('hidden'); }
 function hide(node) { node.classList.add('hidden'); }
 
-function renderLeaderboard(list, me) {
+function renderLeaderboard(list, me, pvp) {
   el.leaderboard.innerHTML = list.map((r, i) =>
-    `<div class="lb-row ${me && r.name === me.name ? 'me' : ''}"><span>${i + 1}. ${r.name}</span><span>${fmt(r.time)} · ${r.kills} kills</span></div>`
+    `<div class="lb-row ${me && r.name === me.name ? 'me' : ''}"><span>${i + 1}. ${r.name}</span><span>${pvp ? `${r.kills} K / ${r.deaths} D` : `${fmt(r.time)} · ${r.kills} kills`}</span></div>`
   ).join('') || '<div class="lb-row">No scores yet</div>';
 }
 
@@ -209,9 +228,18 @@ setInterval(() => {
 }, 1000 / 30);
 
 // ---- Menu buttons ----------------------------------------------------------
+function setMode(m) {
+  selectedMode = m;
+  el.modePve.classList.toggle('active', m === 'pve');
+  el.modePvp.classList.toggle('active', m === 'pvp');
+  refreshWeaponOptions();
+}
+el.modePve.onclick = () => setMode('pve');
+el.modePvp.onclick = () => setMode('pvp');
+
 $('create-btn').onclick = () => {
   const name = $('name-input').value.trim() || 'Player';
-  send({ type: 'create', name, weapon: $('weapon-select').value });
+  send({ type: 'create', name, weapon: $('weapon-select').value, mode: selectedMode });
 };
 $('join-btn').onclick = () => {
   const room = $('room-input').value.trim().toUpperCase();
@@ -338,17 +366,19 @@ function drawBullet(b) {
 
 function updateHUD() {
   if (!current) return;
-  el.time.textContent = fmt(current.time || 0);
   const me = current.players.find(p => p.id === myId);
+  el.time.textContent = mode === 'pvp'
+    ? fmt(Math.max(0, 180 - (current.time || 0) / 100))
+    : fmt(current.time || 0);
   if (me) {
-    el.kills.textContent = me.k;
+    el.kills.textContent = mode === 'pvp' ? `${me.k}/${me.dth || 0}` : me.k;
     el.hpFill.style.width = `${100 * me.hp / me.mh}%`;
     el.weapon.textContent = (weaponDefs[me.w] || { name: me.w }).name.toUpperCase();
     el.dash.textContent = me.d > 0 ? `DASH ${(me.d / 1000).toFixed(1)}s` : 'DASH READY';
     el.dash.classList.toggle('cooling', me.d > 0);
   }
   el.players.innerHTML = current.players.map(p =>
-    `<span class="pchip ${p.al ? '' : 'dead'}" style="color:${p.c}">${p.n} ${p.k}</span>`
+    `<span class="pchip ${p.al ? '' : 'dead'}" style="color:${p.c}">${p.n} ${mode === 'pvp' ? `${p.k}/${p.dth || 0}` : p.k}</span>`
   ).join('');
   if (phase === 'waiting') {
     el.waitingPlayers.innerHTML = current.players.map(p =>
