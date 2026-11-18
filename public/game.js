@@ -4,22 +4,25 @@
 // ART HOOK — drop files into public/assets/ and they replace the placeholders
 // automatically. See public/assets/README.md for the exact asset brief.
 // ---------------------------------------------------------------------------
+// Each key tries PNG first (so DeepSeek art overrides automatically), then SVG.
 const ASSETS = {
-  player:          'assets/player.png',
-  'enemy-crawler': 'assets/enemy-crawler.png',
-  'enemy-runner':  'assets/enemy-runner.png',
-  'enemy-tank':    'assets/enemy-tank.png',
-  'enemy-spitter': 'assets/enemy-spitter.png',
-  'enemy-boss':    'assets/enemy-boss.png',
-  bullet:          'assets/bullet.png',
-  'bullet-hostile':'assets/bullet-hostile.png',
-  'bg-tile':       'assets/bg-tile.png',
+  player:          ['assets/player.png', 'assets/player.svg'],
+  'enemy-crawler': ['assets/enemy-crawler.png', 'assets/enemy-crawler.svg'],
+  'enemy-runner':  ['assets/enemy-runner.png', 'assets/enemy-runner.svg'],
+  'enemy-tank':    ['assets/enemy-tank.png', 'assets/enemy-tank.svg'],
+  'enemy-spitter': ['assets/enemy-spitter.png', 'assets/enemy-spitter.svg'],
+  'enemy-boss':    ['assets/enemy-boss.png', 'assets/enemy-boss.svg'],
+  bullet:          ['assets/bullet.png', 'assets/bullet.svg'],
+  'bullet-hostile':['assets/bullet-hostile.png', 'assets/bullet-hostile.svg'],
+  'bg-tile':       ['assets/bg-tile.png', 'assets/bg-tile.svg'],
 };
 const images = {};
-for (const [key, url] of Object.entries(ASSETS)) {
+for (const [key, files] of Object.entries(ASSETS)) {
   const img = new Image();
+  let i = 0;
   img.onload = () => { images[key] = img; };
-  img.src = url;
+  img.onerror = () => { i++; if (i < files.length) img.src = files[i]; else images[key] = null; };
+  img.src = files[0];
 }
 function hasArt(key) { const i = images[key]; return i && i.complete && i.naturalWidth > 0; }
 function sprite(key, x, y, size, angle, fallback) {
@@ -302,7 +305,7 @@ function drawPlayer(p) {
     ctx.lineTo(p.x + Math.cos(p.a) * 70, p.y + Math.sin(p.a) * 70);
     ctx.stroke();
   }
-  sprite('player', p.x, p.y, size, p.a, () => {
+  sprite('player', p.x, p.y, size, p.a + Math.PI / 2, () => {
     ctx.fillStyle = p.c;
     ctx.beginPath(); ctx.arc(p.x, p.y, 14, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = '#080b14'; ctx.lineWidth = 3; ctx.stroke();
@@ -356,7 +359,7 @@ function drawEnemy(e) {
 
 function drawBullet(b) {
   const key = b.h ? 'bullet-hostile' : 'bullet';
-  sprite(key, b.x, b.y, b.r * 3, 0, () => {
+  sprite(key, b.x, b.y, b.r * 3, (b.a || 0) + Math.PI / 2, () => {
     ctx.fillStyle = b.c;
     ctx.shadowColor = b.c; ctx.shadowBlur = 8;
     ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();

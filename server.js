@@ -572,6 +572,7 @@ function tickRoom(room) {
       bullets: room.bullets.map(b => {
         const owner = room.players.get(b.owner);
         return { id: b.id, x: r1(b.x), y: r1(b.y), r: b.r, h: b.hostile ? 1 : 0,
+                 a: r1(Math.atan2(b.vy, b.vx)),
                  c: b.hostile ? '#ff6b6b' : (owner ? owner.color : '#ffe066') };
       }),
     });
