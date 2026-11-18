@@ -1,0 +1,13 @@
+{
+  "name": "recoil-game",
+  "version": "0.1.0",
+  "description": "Top-down co-op PvE where you move by recoil",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

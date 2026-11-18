@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RECOIL — shoot to move</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="game" width="1200" height="800"></canvas>
+
+    <div id="hud">
+      <div class="hud-left">
+        <div class="stat"><span class="label">TIME</span><span id="hud-time" class="value">0:00</span></div>
+        <div class="stat"><span class="label">KILLS</span><span id="hud-kills" class="value">0</span></div>
+      </div>
+      <div class="hud-right">
+        <div class="stat"><span class="label">ROOM</span><span id="hud-room" class="value">----</span></div>
+        <div id="hud-players"></div>
+      </div>
+      <div id="hud-bottom">
+        <div id="hp-bar"><div id="hp-fill"></div></div>
+        <div id="hud-weapon">PISTOL</div>
+        <div id="hud-dash">DASH READY</div>
+      </div>
+    </div>
+
+    <div id="notice"></div>
+
+    <!-- MAIN MENU -->
+    <div id="menu" class="overlay">
+      <div class="panel">
+        <h1>RECOIL</h1>
+        <p class="tagline">You have no movement keys. <strong>You move by shooting.</strong></p>
+        <div class="row"><input id="name-input" maxlength="16" placeholder="Your name" value="Player" /></div>
+        <div class="row">
+          <select id="weapon-select">
+            <option value="pistol">Pistol — balanced</option>
+            <option value="smg" disabled>SMG — unlock at 2:00</option>
+            <option value="shotgun" disabled>Shotgun — unlock at 4:00</option>
+            <option value="sniper" disabled>Sniper — unlock at 6:00</option>
+          </select>
+        </div>
+        <div class="row buttons">
+          <button id="create-btn" class="primary">CREATE ROOM</button>
+        </div>
+        <div class="divider">or join a friend</div>
+        <div class="row">
+          <input id="room-input" maxlength="4" placeholder="ROOM CODE" />
+          <button id="join-btn">JOIN</button>
+        </div>
+        <p id="menu-error" class="error"></p>
+        <div class="controls-help">
+          <span><b>MOUSE</b> aim</span><span><b>CLICK</b> fire + recoil</span><span><b>SPACE</b> dash</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- WAITING -->
+    <div id="waiting" class="overlay hidden">
+      <div class="panel">
+        <h2>ROOM <span id="waiting-code"></span></h2>
+        <p>Share this code with friends. Host starts the round when ready.</p>
+        <div id="waiting-players"></div>
+        <button id="start-btn" class="primary hidden" style="margin-top:18px">START ROUND</button>
+        <p id="waiting-hint" class="hint">Waiting for the host to start…</p>
+      </div>
+    </div>
+
+    <!-- UPGRADE -->
+    <div id="upgrade" class="overlay hidden">
+      <div class="panel wide">
+        <h2>CHOOSE AN UPGRADE</h2>
+        <div id="upgrade-cards"></div>
+        <p class="hint">Press 1, 2 or 3</p>
+      </div>
+    </div>
+
+    <!-- GAME OVER -->
+    <div id="gameover" class="overlay hidden">
+      <div class="panel wide">
+        <h2>SURVIVED <span id="final-time"></span></h2>
+        <div id="final-stats"></div>
+        <h3>LEADERBOARD</h3>
+        <div id="leaderboard"></div>
+        <button id="again-btn" class="primary">PLAY AGAIN</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
