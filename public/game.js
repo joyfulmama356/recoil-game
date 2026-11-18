@@ -62,6 +62,8 @@ let previous = null, current = null, prevAt = 0, curAt = 0;
 let phase = 'menu';
 let selectedMode = 'pve';
 let mode = 'pve';
+let pvpTimeLimit = 180;
+let pvpKillLimit = 5;
 let pvpLeaderboard = [];
 let upgradeOptions = [];
 let mouse = { x: arena.w / 2, y: arena.h / 2, down: false };
@@ -103,13 +105,15 @@ function handle(m) {
     case 'init':
       myId = m.id; hostId = m.hostId; roomCode = m.room; arena = m.arena;
       mode = m.mode || 'pve'; pvpLeaderboard = m.pvpLeaderboard || [];
+      pvpTimeLimit = m.pvpTimeLimit || 180;
+      pvpKillLimit = m.pvpKillLimit || 5;
       weaponDefs = m.weapons || {}; enemyDefs = m.enemies || {};
       canvas.width = arena.w; canvas.height = arena.h;
       el.room.textContent = roomCode;
       el.waitingCode.textContent = roomCode;
-      el.modeVal.textContent = mode === 'pvp' ? 'PvP · FIRST TO 5' : 'CO-OP';
+      el.modeVal.textContent = mode === 'pvp' ? `PvP · FIRST TO ${pvpKillLimit}` : 'CO-OP';
       el.waitingHint.textContent = mode === 'pvp'
-        ? 'PvP: first to 5 kills wins. Waiting for the host to start…'
+        ? `PvP: first to ${pvpKillLimit} kills wins. Waiting for the host to start…`
         : 'Waiting for the host to start…';
       renderLeaderboard(mode === 'pvp' ? pvpLeaderboard : (m.leaderboard || []));
       show(el.waiting);
@@ -128,7 +132,7 @@ function handle(m) {
       break;
     case 'start':
       mode = m.mode || mode;
-      el.modeVal.textContent = mode === 'pvp' ? 'PvP · FIRST TO 5' : 'CO-OP';
+      el.modeVal.textContent = mode === 'pvp' ? `PvP · FIRST TO ${pvpKillLimit}` : 'CO-OP';
       hide(el.waiting); hide(el.menu); hide(el.gameover); hide(el.upgrade);
       phase = 'playing';
       break;
@@ -371,7 +375,7 @@ function updateHUD() {
   if (!current) return;
   const me = current.players.find(p => p.id === myId);
   el.time.textContent = mode === 'pvp'
-    ? fmt(Math.max(0, 180 - (current.time || 0) / 100))
+    ? fmt(Math.max(0, pvpTimeLimit - (current.time || 0)))
     : fmt(current.time || 0);
   if (me) {
     el.kills.textContent = mode === 'pvp' ? `${me.k}/${me.dth || 0}` : me.k;

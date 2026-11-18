@@ -8,15 +8,15 @@ const { WebSocketServer } = require('ws');
 const PORT = Number(process.env.PORT) || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const DATA_DIR = path.join(__dirname, 'data');
-const SCORES_FILE = path.join(DATA_DIR, 'scores.json');
-const PVP_SCORES_FILE = path.join(DATA_DIR, 'pvp-scores.json');
+const SCORES_FILE = process.env.SCORES_FILE || path.join(DATA_DIR, 'scores.json');
+const PVP_SCORES_FILE = process.env.PVP_SCORES_FILE || path.join(DATA_DIR, 'pvp-scores.json');
 
 // ---- Tuning ---------------------------------------------------------------
 const SPAWN_BASE_MS = 3600;        // much calmer than before
 const SPAWN_MIN_MS = 1800;
 const MAX_ALIVE_ENEMIES = 24;      // hard cap so the arena never floods
 const SPAWN_RAMP = 0.30;           // ms shaved per ms survived
-const PVP_KILL_LIMIT = 5;
+const PVP_KILL_LIMIT = Number(process.env.PVP_KILL_LIMIT) || 5;
 const PVP_TIME_LIMIT = Number(process.env.PVP_TIME_LIMIT) || 180000; // 3 min
 const PVP_RESPAWN_MS = 2000;
 
@@ -31,8 +31,8 @@ const DASH_IMPULSE = 13;          // px per tick, toward aim
 const DASH_COOLDOWN = 3000;       // ms
 const INVULN_MS = 500;
 const STARTING_HP = 100;
-const UPGRADE_INTERVAL = 60000;   // ms
-const BOSS_INTERVAL = 300000;     // ms
+const UPGRADE_INTERVAL = Number(process.env.UPGRADE_INTERVAL) || 60000; // ms
+const BOSS_INTERVAL = Number(process.env.BOSS_INTERVAL) || 300000;      // ms
 
 const WEAPONS = {
   pistol:  { name: 'Pistol',  rate: 4,   damage: 10, recoil: 6,  pellets: 1, spread: 0,    speed: 14, radius: 4, unlock: 0 },
@@ -75,9 +75,11 @@ const sockets = new Map(); // ws -> { roomCode, playerId }
 let nextId = 1;
 let nextEntityId = 1;
 
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-if (!fs.existsSync(SCORES_FILE)) fs.writeFileSync(SCORES_FILE, '[]');
-if (!fs.existsSync(PVP_SCORES_FILE)) fs.writeFileSync(PVP_SCORES_FILE, '[]');
+for (const file of [SCORES_FILE, PVP_SCORES_FILE]) {
+  const dir = path.dirname(file);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!fs.existsSync(file)) fs.writeFileSync(file, '[]');
+}
 
 function loadScores(file = SCORES_FILE) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return []; }
@@ -87,7 +89,11 @@ function saveScores(scores, file = SCORES_FILE) {
 }
 function makeCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  return Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  let code;
+  do {
+    code = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  } while (rooms.has(code));
+  return code;
 }
 function send(ws, obj) {
   if (ws.readyState === 1) ws.send(JSON.stringify(obj));
@@ -144,6 +150,7 @@ function addPlayer(room, ws, name, weaponKey) {
   send(ws, {
     type: 'init', id, hostId: room.hostId, room: room.code, arena: ARENA,
     mode: room.mode,
+    pvpTimeLimit: PVP_TIME_LIMIT / 1000, pvpKillLimit: PVP_KILL_LIMIT,
     weapons: Object.fromEntries(Object.entries(WEAPONS).map(([k, v]) => [k, { name: v.name, unlock: v.unlock }])),
     enemies: Object.fromEntries(Object.entries(ENEMY_TYPES).map(([k, v]) => [k, { color: v.color }])),
     leaderboard: loadScores(),
@@ -287,7 +294,7 @@ function fire(room, p, stats) {
       id: 'b' + nextEntityId++, x: p.x + Math.cos(a) * (PLAYER_RADIUS + 4), y: p.y + Math.sin(a) * (PLAYER_RADIUS + 4),
       vx: Math.cos(a) * stats.speed, vy: Math.sin(a) * stats.speed,
       r: stats.radius, dmg: stats.damage, pierce: stats.pierce,
-      hostile: false, owner: p.id, life: 75,
+      hostile: false, owner: p.id, life: 75, hits: [],
     });
   }
   p.vx -= Math.cos(p.angle) * stats.recoil;
@@ -429,9 +436,10 @@ function resolveCollisions(room) {
       }
     } else {
       for (const e of room.enemies) {
-        if (deadEnemies.has(e.id)) continue;
+        if (deadEnemies.has(e.id) || b.hits.includes(e.id)) continue;
         if (Math.hypot(e.x - b.x, e.y - b.y) < e.r + b.r) {
           e.hp -= b.dmg;
+          b.hits.push(e.id);
           const owner = room.players.get(b.owner);
           if (owner) owner.damageDealt += b.dmg;
           if (e.hp <= 0) {
@@ -471,9 +479,9 @@ function resolveCollisions(room) {
 function startUpgrade(room) {
   room.phase = 'upgrade';
   for (const p of room.players.values()) p.picked = false;
-  const pool = UPGRADES.map(u => u.id);
   for (const p of room.players.values()) {
     if (!p.alive) continue;
+    const pool = UPGRADES.map(u => u.id);
     const opts = [];
     while (opts.length < 3 && pool.length) {
       const i = Math.floor(Math.random() * pool.length);
@@ -561,7 +569,7 @@ function tickRoom(room) {
       type: 'state',
       phase: room.phase,
       mode: room.mode,
-      time: Math.round(room.time / 100),
+      time: r1(room.time / 1000),
       players: [...room.players.values()].map(p => ({
         id: p.id, n: p.name, c: p.color, x: r1(p.x), y: r1(p.y), a: r1(p.angle),
         hp: Math.round(p.hp), mh: p.maxHp, w: p.weapon, al: p.alive,
@@ -608,8 +616,8 @@ wss.on('connection', ws => {
     if (msg.type === 'join') {
       const room = rooms.get(String(msg.room || '').toUpperCase());
       if (!room) { send(ws, { type: 'error', text: 'Room not found' }); return; }
-      if (room.players.size >= 4) { send(ws, { type: 'error', text: 'Room full' }); return; }
       if (room.phase !== 'waiting') { send(ws, { type: 'error', text: 'Game already in progress' }); return; }
+      if (room.players.size >= 4) { send(ws, { type: 'error', text: 'Room full' }); return; }
       addPlayer(room, ws, msg.name, msg.weapon);
       return;
     }
